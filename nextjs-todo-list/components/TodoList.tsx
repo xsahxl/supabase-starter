@@ -1,6 +1,6 @@
 import { Database } from '@/lib/schema'
 import { Session, useSupabaseClient } from '@supabase/auth-helpers-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 
 type Todos = Database['public']['Tables']['todos']['Row']
 
@@ -25,6 +25,47 @@ export default function TodoList({ session }: { session: Session }) {
 
     fetchTodos()
   }, [supabase])
+
+  // --- Realtime 订阅 ---
+  useEffect(() => {
+    // 只在用户存在时订阅
+    if (!user) return
+    // 创建 channel
+    const channel = supabase.channel('todos-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'todos',
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setTodos((prev) => {
+              const newTodo = payload.new as Todos
+              if (prev.some((t) => t.id === newTodo.id)) return prev
+              return [...prev, newTodo]
+            })
+          } else if (payload.eventType === 'UPDATE') {
+            setTodos((prev) => {
+              const updatedTodo = payload.new as Todos
+              return prev.map((t) => (t.id === updatedTodo.id ? updatedTodo : t))
+            })
+          } else if (payload.eventType === 'DELETE') {
+            setTodos((prev) => {
+              const deletedTodo = payload.old as Todos
+              return prev.filter((t) => t.id !== deletedTodo.id)
+            })
+          }
+        }
+      )
+      .subscribe()
+
+    // 卸载时移除 channel
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [supabase, user])
 
   const addTodo = async (taskText: string) => {
     let task = taskText.trim()
