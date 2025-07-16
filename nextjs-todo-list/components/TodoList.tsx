@@ -71,7 +71,7 @@ export default function TodoList({ session }: { session: Session }) {
     let task = taskText.trim()
     if (task.length) {
       const { data: todo, error } = await supabase
-        .from('todos')
+        .from('safe_todos')
         .insert({ task, user_id: user.id })
         .select()
         .single()
@@ -87,7 +87,7 @@ export default function TodoList({ session }: { session: Session }) {
 
   const deleteTodo = async (id: number) => {
     try {
-      await supabase.from('todos').delete().eq('id', id).throwOnError()
+      await supabase.from('safe_todos').delete().eq('id', id).throwOnError()
       setTodos(todos.filter((x) => x.id != id))
     } catch (error) {
       console.log('error', error)
@@ -137,7 +137,7 @@ const Todo = ({ todo, onDelete }: { todo: Todos; onDelete: () => void }) => {
   const toggle = async () => {
     try {
       const { data } = await supabase
-        .from('todos')
+        .from('safe_todos')
         .update({ is_complete: !isCompleted })
         .eq('id', todo.id)
         .throwOnError()
